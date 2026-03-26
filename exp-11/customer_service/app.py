@@ -1,35 +1,47 @@
 from flask import Flask, jsonify
+import requests
 
 app = Flask(__name__)
 
-# In-memory data
 customers = {
-    1: {"name": "John"},
-    2: {"name": "Alice"}
+    101: {"id": 101, "name": "Customer-1", "email": "customer-1@example.com"},
+    102: {"id": 102, "name": "Customer-2", "email": "customer-2@example.com"}
 }
 
-orders = {
-    1: [{"order_id": 101, "status": "Pending"}],
-    2: [{"order_id": 102, "status": "Shipped"}]
-}
 
-# Home route (fixes Not Found error)
-@app.route('/')
+@app.route("/customers/<int:user_id>/orders")
+def get_account_details(user_id):
+    customer = customers.get(user_id)
+
+    if not customer:
+        return jsonify({"error": "Customer not found"}), 404
+
+    # Call Order Service
+    try:
+        response = requests.get(
+            f"http://localhost:5002/orders/user/{user_id}",
+            timeout=3
+        )
+
+        if response.status_code == 200:
+            orders = response.json()
+        else:
+            orders = []
+    except requests.exceptions.RequestException:
+        orders = []
+    
+    account_data = {
+        "customer": customer,
+        "orders": orders
+    }
+
+    return jsonify(account_data)
+
+
+@app.route("/")
 def home():
-    return jsonify({
-        "service": "Customer Service",
-        "status": "running"
-    })
+    return jsonify({"service": "Customer Service Running"})
 
-# API: Get customer orders
-@app.route('/customer/<int:customer_id>/orders', methods=['GET'])
-def get_orders(customer_id):
-    if customer_id in orders:
-        return jsonify({
-            "customer_id": customer_id,
-            "orders": orders[customer_id]
-        })
-    return jsonify({"error": "Customer not found"}), 404
 
-if __name__ == '__main__':
-    app.run(port=5000, debug=True)
+if __name__ == "__main__":
+    app.run(port=5001, debug=True)
